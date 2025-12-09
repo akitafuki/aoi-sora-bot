@@ -57,7 +57,7 @@ export async function getLatestPosts(sinceUri: string | null) {
         // A reply usually has a 'reply' record attached to the record object
         // We need to inspect the record type safely
         if (!AppBskyFeedPost.isRecord(post.record)) continue;
-        const record = post.record; 
+        const record = post.record as AppBskyFeedPost.Record; 
         const isReply = !!record.reply; 
         if (config.filters.ignoreReplies && isReply) continue;
 
