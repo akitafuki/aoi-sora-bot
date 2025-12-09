@@ -35,7 +35,7 @@ export async function postToDiscord(feedView: AppBskyFeedDefs.FeedViewPost) {
 
   const post = feedView.post;
   if (!AppBskyFeedPost.isRecord(post.record)) return; // Skip if not a valid record
-  const record = post.record;
+  const record = post.record as AppBskyFeedPost.Record;
   const text = record.text || '';
   
   // Construct URL
