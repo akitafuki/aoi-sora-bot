@@ -1,0 +1,28 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model BotState {
+  id                   Int      @id @default(1)
+  lastProcessedPostUri String?
+  lastProcessedAt      DateTime?
+}
+
+model PostHistory {
+  id        Int      @id @default(autoincrement())
+  postUri   String   @unique
+  postedAt  DateTime @default(now())
+  discordId String?  // Optional: if we want to track the discord message ID later
+}
+
+model Config {
+  id                  Int      @id @default(1)
+  pollIntervalMinutes Int      @default(5)
+  ignoreReplies       Boolean  @default(true)
+  ignoreReposts       Boolean  @default(true)
+  ignoreKeywords      String[] // Prisma supports arrays for Postgres
+}

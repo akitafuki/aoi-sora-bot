@@ -22,7 +22,9 @@ export async function authenticateBluesky() {
   }
 }
 
-export async function getLatestPosts(sinceUri: string | null) {
+import { AppSettings } from './config';
+
+export async function getLatestPosts(sinceUri: string | null, settings: AppSettings) {
   if (!isAuthenticated) await authenticateBluesky();
 
   try {
@@ -51,7 +53,7 @@ export async function getLatestPosts(sinceUri: string | null) {
         // The feed usually contains your own posts, replies, and reposts.
         // If it's a repost by YOU, the reason will be populated.
         const isRepost = !!feedView.reason; 
-        if (config.filters.ignoreReposts && isRepost) continue;
+        if (settings.ignoreReposts && isRepost) continue;
 
         // 2. Ignore Replies (if configured)
         // A reply usually has a 'reply' record attached to the record object
@@ -59,12 +61,12 @@ export async function getLatestPosts(sinceUri: string | null) {
         if (!AppBskyFeedPost.isRecord(post.record)) continue;
         const record = post.record as AppBskyFeedPost.Record; 
         const isReply = !!record.reply; 
-        if (config.filters.ignoreReplies && isReply) continue;
+        if (settings.ignoreReplies && isReply) continue;
 
         // 3. Keywords (if configured)
-        if (config.filters.ignoreKeywords.length > 0) {
+        if (settings.ignoreKeywords.length > 0) {
             const text = (record?.text || '').toLowerCase();
-            const hasKeyword = config.filters.ignoreKeywords.some(kw => text.includes(kw.toLowerCase()));
+            const hasKeyword = settings.ignoreKeywords.some(kw => text.includes(kw.toLowerCase()));
             if (hasKeyword) continue;
         }
 
