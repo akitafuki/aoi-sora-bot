@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { getSettings, updateSettings } from './config';
 import { loadState } from './state';
 import { prisma } from './db';
+import { swaggerOptions } from './swaggerConfig';
 
 const app = express();
 
@@ -51,33 +52,7 @@ const configSchema = z.object({
   ignoreKeywords: z.array(z.string()).optional(),
 });
 
-// Swagger Options
-const options = {
-  definition: {
-    openapi: '3.0.0',
-    info: {
-      title: 'BlueSky Bot API',
-      version: '1.0.0',
-    },
-    components: {
-      securitySchemes: {
-        ApiKeyAuth: {
-          type: 'apiKey',
-          in: 'header',
-          name: 'x-api-key',
-        },
-      },
-    },
-    security: [
-      {
-        ApiKeyAuth: [],
-      },
-    ],
-  },
-  apis: ['./src/server.ts'], // Path to the API docs
-};
-
-const openapiSpecification = swaggerJsdoc(options);
+const openapiSpecification = swaggerJsdoc(swaggerOptions);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(openapiSpecification));
 
 // Define Trigger Callback
