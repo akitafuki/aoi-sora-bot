@@ -1,22 +1,19 @@
-import { config } from './config';
+import { config, getSettings } from './config';
 import { loadState, saveState } from './state';
 import { authenticateBluesky, getLatestPosts } from './bluesky';
 import { initDiscord, postToDiscord } from './discord';
+import { startServer, setTriggerCallback } from './server';
+import { prisma } from './db';
 
 async function runCheck() {
   console.log('Checking for new posts...');
   const state = await loadState();
-  
-  // If it's the very first run (lastProcessedPostUri is null), 
-  // we might not want to dump the entire history. 
-  // Let's just fetch the latest and mark it as seen without posting, 
-  // OR post just the single latest one.
-  // For this implementation: If null, we fetch latest, mark it, and don't post.
-  // This avoids spamming 10 old posts on first startup.
+  const settings = await getSettings();
   
   const isFirstRun = state.lastProcessedPostUri === null;
 
-  const newPosts = await getLatestPosts(state.lastProcessedPostUri);
+  // Pass dynamic settings to getLatestPosts
+  const newPosts = await getLatestPosts(state.lastProcessedPostUri, settings);
 
   if (newPosts.length === 0) {
     console.log('No new posts.');
@@ -25,7 +22,7 @@ async function runCheck() {
 
   // If first run, just save the latest one and skip posting
   if (isFirstRun) {
-      const latest = newPosts[newPosts.length - 1]; // validPosts are sorted Oldest -> Newest
+      const latest = newPosts[newPosts.length - 1]; 
       if (latest) {
           console.log(`First run detected. Marking latest post (${latest.post.uri}) as processed without sending.`);
           
@@ -41,7 +38,19 @@ async function runCheck() {
   for (const feedView of newPosts) {
       await postToDiscord(feedView);
       
-      // Save state after each success so we don't re-post if we crash halfway
+      // Save to History
+      try {
+          await prisma.postHistory.create({
+              data: {
+                  postUri: feedView.post.uri,
+                  postedAt: new Date()
+              }
+          });
+      } catch (e) {
+          console.error("Failed to save history", e);
+      }
+
+      // Save state
       await saveState({
           lastProcessedPostUri: feedView.post.uri,
           lastProcessedAt: new Date().toISOString()
@@ -49,20 +58,35 @@ async function runCheck() {
   }
 }
 
+async function scheduleNextRun() {
+    const settings = await getSettings();
+    const intervalMs = settings.pollIntervalMinutes * 60 * 1000;
+    setTimeout(async () => {
+        try {
+            await runCheck();
+        } catch (e) {
+            console.error("Error during scheduled check:", e);
+        }
+        scheduleNextRun();
+    }, intervalMs);
+}
+
 async function main() {
   try {
     console.log('Starting BlueSky -> Discord Bot...');
     
+    // Start API Server
+    startServer(config.port);
+    setTriggerCallback(runCheck);
+
     await authenticateBluesky();
     await initDiscord();
 
     // Initial run
     await runCheck();
 
-    // Schedule polling
-    const intervalMs = config.pollIntervalMinutes * 60 * 1000;
-    setInterval(runCheck, intervalMs);
-    console.log(`Polling scheduled every ${config.pollIntervalMinutes} minutes.`);
+    // Start Polling Loop
+    scheduleNextRun();
 
   } catch (error) {
     console.error('Fatal Error:', error);

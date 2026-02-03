@@ -2,108 +2,110 @@
 
 This project provides a Discord bot that cross-posts your BlueSky posts to a specified Discord channel. It is built with TypeScript and Node.js, integrating with BlueSky via `@atproto/api` and Discord via `discord.js`.
 
+**New:** Now includes a REST API for management and uses PostgreSQL for robust state and history tracking.
+
 ## Features
 
 -   **BlueSky Integration:** Connects to the BlueSky network (AT Protocol) to fetch your posts.
 -   **Discord Integration:** Connects to Discord to send formatted messages, including rich embeds with images and links.
--   **Polling:** Periodically checks for new posts to avoid overwhelming APIs.
--   **Filtering Options:**
-    -   Ignores replies by default.
-    -   Ignores reposts (retweets) by default.
-    -   (Extendable for keyword filtering)
--   **State Persistence:** Uses a `state.json` file to keep track of the last processed post, preventing duplicate posts on restarts.
--   **Docker Support:** Includes a `Dockerfile` for easy deployment.
+-   **Dynamic Configuration:** Change poll intervals and filters via API without restarting.
+-   **API & Documentation:** Includes a Swagger/OpenAPI interface for easy management.
+-   **Database:** Uses PostgreSQL (via Prisma) to store execution state, configuration, and post history.
+-   **Docker Support:** Full `docker-compose` setup for easy deployment.
+
+## Prerequisites
+
+-   [Docker](https://docs.docker.com/get-docker/) & [Docker Compose](https://docs.docker.com/compose/install/)
+-   Node.js (if running locally without Docker)
 
 ## Setup
 
 ### 1. Clone the Repository
 
 ```bash
-# Assuming you are in the directory where you want to clone the project
-# git clone <repository-url>
-# cd blue-sky-discord-bot
+git clone <repository-url>
+cd blue-sky-discord-bot
 ```
 
-### 2. Install Dependencies
+### 2. Configure Environment Variables
 
-```bash
-npm install
-```
-
-### 3. Configure Environment Variables
-
-Rename `.env.example` to `.env` and fill in your credentials and configuration:
+Rename `.env.example` to `.env` and fill in your credentials:
 
 ```bash
 cp .env.example .env
 ```
 
-Edit the newly created `.env` file with your specific values:
+Edit the `.env` file:
+-   `BLUESKY_IDENTIFIER`: Your BlueSky handle.
+-   `BLUESKY_APP_PASSWORD`: App Password from BlueSky settings.
+-   `DISCORD_TOKEN`: Discord Bot Token.
+-   `DISCORD_CHANNEL_ID`: Channel ID to post to.
+-   `DATABASE_URL`: Connection string for Postgres (default provided in example works with docker-compose).
+-   `PORT`: API Port (default 3000).
 
--   `BLUESKY_IDENTIFIER`: Your BlueSky handle (e.g., `your-handle.bsky.social`).
--   `BLUESKY_APP_PASSWORD`: Generate an **App Password** for the bot from your BlueSky settings (Settings > Advanced > App Passwords). **Do NOT use your main BlueSky password.**
--   `DISCORD_TOKEN`: Create a new bot application in the [Discord Developer Portal](https://discord.com/developers/applications), then navigate to "Bot" to get your token. Ensure your bot has the necessary permissions to send messages in the target channel.
--   `DISCORD_CHANNEL_ID`: In Discord, enable "Developer Mode" (User Settings > Advanced). Then, right-click on the desired channel and select "Copy ID".
--   `POLL_INTERVAL_MINUTES`: The interval (in minutes) at which the bot will check for new BlueSky posts (default is `5`).
+## Running with Docker (Recommended)
 
-### 4. Build the Project
+The easiest way to run the bot and the database is using Docker Compose.
 
-```bash
-npm run build
-```
-
-## Running the Bot
-
-### Development Mode (with `ts-node`)
-
-For development, you can run the bot directly using `ts-node`:
-
-```bash
-npm run dev
-```
-
-### Production Mode (from compiled JavaScript)
-
-To run the compiled JavaScript:
-
-```bash
-npm start
-```
-
-### Running with Docker
-
-For a containerized deployment:
-
-1.  **Build the Docker image:**
+1.  **Start the services:**
     ```bash
-    docker build -t bsky-bot .
+    docker-compose up -d --build
+    ```
+    This will start the PostgreSQL database and the Bot application. The bot will automatically run database migrations on startup.
+
+2.  **View Logs:**
+    ```bash
+    docker-compose logs -f app
     ```
 
-2.  **Run the Docker container:**
-    Make sure your `.env` file is correctly configured in the project root.
+3.  **Stop services:**
     ```bash
-    docker run -d --name bsky-discord-bot --env-file ./.env bsky-bot
+    docker-compose down
     ```
-    -   `-d`: Runs the container in detached mode (in the background).
-    -   `--name bsky-discord-bot`: Assigns a name to your container.
-    -   `--env-file ./.env`: Mounts your `.env` file into the container for environment variables.
 
-### Stopping the Docker Container
+## API & Documentation
 
-If you need to stop the running Docker container:
+The bot exposes a REST API for management and monitoring.
 
+-   **Base URL:** `http://localhost:3000`
+-   **Swagger UI:** `http://localhost:3000/api-docs`
+
+### Key Endpoints
+
+-   `GET /status`: View current bot state (last processed post).
+-   `GET /config`: View current runtime configuration.
+-   `PATCH /config`: Update configuration (poll interval, filters).
+-   `POST /trigger`: Force an immediate check for new posts.
+-   `GET /history`: View a log of recently sent posts.
+
+**Example: Update Configuration**
 ```bash
-docker stop bsky-discord-bot
-docker rm bsky-discord-bot # Optional: to remove the container
+curl -X PATCH http://localhost:3000/config \
+  -H "Content-Type: application/json" \
+  -d '{"pollIntervalMinutes": 10, "ignoreReplies": false}'
 ```
 
-## Filtering Options
+## Local Development (Without Docker)
 
-The bot includes basic filtering:
+If you want to run locally:
 
--   **`config.ts`**:
-    -   `config.filters.ignoreReplies`: Set to `true` to ignore replies (default: `true`).
-    -   `config.filters.ignoreReposts`: Set to `true` to ignore reposts (default: `true`).
-    -   `config.filters.ignoreKeywords`: An array of strings. Posts containing any of these keywords (case-insensitive) will be ignored. You can modify this directly in `src/config.ts` for now. For a more robust solution, this could be moved to an environment variable or a separate configuration file.
+1.  **Install Dependencies:**
+    ```bash
+    npm install
+    ```
 
-Feel free to modify `src/config.ts` to adjust these filtering behaviors.
+2.  **Start Database:**
+    You still need a Postgres database. You can run just the DB via Docker:
+    ```bash
+    docker-compose up -d db
+    ```
+
+3.  **Run Migrations:**
+    ```bash
+    npx prisma migrate dev
+    ```
+
+4.  **Start the Bot:**
+    ```bash
+    npm run dev
+    ```
