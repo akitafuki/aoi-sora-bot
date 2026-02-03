@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import swaggerJsdoc from 'swagger-jsdoc';
 import Converter from 'openapi-to-postmanv2';
-import { swaggerOptions } from '../src/swaggerConfig';
+import { swaggerOptions } from './swaggerConfig';
 
 const OUTPUT_DIR = path.join(__dirname, '..');
 const OPENAPI_FILE = path.join(OUTPUT_DIR, 'openapi.json');
