@@ -7,7 +7,11 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "strict": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@atproto/api": ["node_modules/@atproto/api/dist/index.d.ts"]
+    }
   },
-  "exclude": ["prisma.config.ts"]
+  "exclude": ["prisma.config.ts", "tests"]
 }
