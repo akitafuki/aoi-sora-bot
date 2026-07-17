@@ -25,7 +25,7 @@ const requiredKeys = [
 
 const missingKeys = requiredKeys.filter(key => !process.env[key]);
 
-if (missingKeys.length > 0) {
+if (missingKeys.length > 0 && process.env.NODE_ENV !== 'test') {
   console.error(`Missing required environment variables: ${missingKeys.join(', ')}`);
   process.exit(1);
 }
