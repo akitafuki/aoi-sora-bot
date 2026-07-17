@@ -129,6 +129,7 @@ app.patch('/config', authenticate, async (req, res) => {
       const settings = await updateSettings(validation.data);
       res.json(settings);
   } catch (error) {
+      console.error('Failed to update settings:', error);
       res.status(500).json({ error: 'Failed to update settings' });
   }
 });
@@ -168,6 +169,7 @@ app.get('/history', authenticate, async (req, res) => {
     });
     res.json(history);
   } catch (error) {
+    console.error('Failed to fetch history:', error);
     res.status(500).json({ error: 'Failed to fetch history' });
   }
 });
