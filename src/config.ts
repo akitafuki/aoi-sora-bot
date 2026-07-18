@@ -12,21 +12,23 @@ export const config = {
   discord: {
     token: process.env.DISCORD_TOKEN || '',
     channelId: process.env.DISCORD_CHANNEL_ID || '',
+    webhookUrl: process.env.DISCORD_WEBHOOK_URL || '',
   },
   port: parseInt(process.env.PORT || '3000', 10),
 };
 
-const requiredKeys = [
-  'BLUESKY_IDENTIFIER',
-  'BLUESKY_APP_PASSWORD',
-  'DISCORD_TOKEN',
-  'DISCORD_CHANNEL_ID'
-];
+const hasBluesky = !!(process.env.BLUESKY_IDENTIFIER && process.env.BLUESKY_APP_PASSWORD);
+const hasWebhook = !!process.env.DISCORD_WEBHOOK_URL;
+const hasBot = !!(process.env.DISCORD_TOKEN && process.env.DISCORD_CHANNEL_ID);
 
-const missingKeys = requiredKeys.filter(key => !process.env[key]);
-
-if (missingKeys.length > 0 && process.env.NODE_ENV !== 'test') {
-  console.error(`Missing required environment variables: ${missingKeys.join(', ')}`);
+if ((!hasBluesky || (!hasWebhook && !hasBot)) && process.env.NODE_ENV !== 'test') {
+  const missing = [];
+  if (!process.env.BLUESKY_IDENTIFIER) missing.push('BLUESKY_IDENTIFIER');
+  if (!process.env.BLUESKY_APP_PASSWORD) missing.push('BLUESKY_APP_PASSWORD');
+  if (!hasWebhook && !hasBot) {
+    missing.push('Either DISCORD_WEBHOOK_URL OR both (DISCORD_TOKEN and DISCORD_CHANNEL_ID)');
+  }
+  console.error(`Missing required environment variables: ${missing.join(', ')}`);
   process.exit(1);
 }
 

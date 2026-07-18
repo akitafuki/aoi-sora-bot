@@ -55,11 +55,16 @@ const configSchema = z.object({
 const openapiSpecification = swaggerJsdoc(swaggerOptions);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(openapiSpecification));
 
-// Define Trigger Callback
+// Define Callbacks
 let triggerCallback: (() => Promise<void>) | null = null;
+let rescheduleCallback: ((intervalMinutes: number) => void) | null = null;
 
 export function setTriggerCallback(cb: () => Promise<void>) {
   triggerCallback = cb;
+}
+
+export function setRescheduleCallback(cb: (intervalMinutes: number) => void) {
+  rescheduleCallback = cb;
 }
 
 /**
@@ -127,6 +132,9 @@ app.patch('/config', authenticate, async (req, res) => {
       }
 
       const settings = await updateSettings(validation.data);
+      if (validation.data.pollIntervalMinutes !== undefined && rescheduleCallback) {
+        rescheduleCallback(validation.data.pollIntervalMinutes);
+      }
       res.json(settings);
   } catch (error) {
       console.error('Failed to update settings:', error);

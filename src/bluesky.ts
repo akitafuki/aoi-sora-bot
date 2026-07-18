@@ -1,5 +1,5 @@
 import { BskyAgent, AppBskyFeedDefs, AppBskyFeedPost } from '@atproto/api';
-import { config } from './config';
+import { config, AppSettings } from './config';
 
 const agent = new BskyAgent({
   service: 'https://bsky.social',
@@ -22,55 +22,65 @@ export async function authenticateBluesky() {
   }
 }
 
-import { AppSettings } from './config';
-
 export async function getLatestPosts(sinceUri: string | null, settings: AppSettings) {
   if (!isAuthenticated) await authenticateBluesky();
 
+  const validPosts: AppBskyFeedDefs.FeedViewPost[] = [];
+  let cursor: string | undefined = undefined;
+  let pageCount = 0;
+  const maxPages = 5; // Scan up to 100 posts max to avoid infinite loops if sinceUri was deleted
+  let foundSinceUri = false;
+
   try {
-    // Fetch author feed
-    const { data } = await agent.getAuthorFeed({
-      actor: config.bluesky.identifier,
-      limit: 10, 
-    });
+    while (pageCount < maxPages) {
+      const response = await agent.getAuthorFeed({
+        actor: config.bluesky.identifier,
+        limit: 20,
+        cursor: cursor,
+      });
 
-    // Filter and sort posts
-    // API returns newest first. We want to process from oldest -> newest if we are catching up,
-    // but for "getLatest" we usually just want the list. 
-    // We need to stop if we hit 'sinceUri'.
+      const feed = response.data.feed;
+      if (!feed || feed.length === 0) break;
 
-    const validPosts: AppBskyFeedDefs.FeedViewPost[] = [];
+      for (const feedView of feed) {
+          const post = feedView.post;
+          
+          if (sinceUri && post.uri === sinceUri) {
+              foundSinceUri = true;
+              break;
+          }
 
-    for (const feedView of data.feed) {
-        const post = feedView.post;
-        
-        // Stop if we reach the last processed post
-        if (post.uri === sinceUri) break;
+          // --- Filtering Logic ---
+          
+          // 1. Ignore Reposts (if configured)
+          const isRepost = !!feedView.reason; 
+          if (settings.ignoreReposts && isRepost) continue;
 
-        // --- Filtering Logic ---
-        
-        // 1. Ignore Reposts (if configured)
-        // The feed usually contains your own posts, replies, and reposts.
-        // If it's a repost by YOU, the reason will be populated.
-        const isRepost = !!feedView.reason; 
-        if (settings.ignoreReposts && isRepost) continue;
+          // 2. Ignore Replies (if configured)
+          if (!AppBskyFeedPost.isRecord(post.record)) continue;
+          const record = post.record as AppBskyFeedPost.Record; 
+          const isReply = !!record.reply; 
+          if (settings.ignoreReplies && isReply) continue;
 
-        // 2. Ignore Replies (if configured)
-        // A reply usually has a 'reply' record attached to the record object
-        // We need to inspect the record type safely
-        if (!AppBskyFeedPost.isRecord(post.record)) continue;
-        const record = post.record as AppBskyFeedPost.Record; 
-        const isReply = !!record.reply; 
-        if (settings.ignoreReplies && isReply) continue;
+          // 3. Keywords (if configured)
+          if (settings.ignoreKeywords.length > 0) {
+              const text = (record?.text || '').toLowerCase();
+              const hasKeyword = settings.ignoreKeywords.some(kw => text.includes(kw.toLowerCase()));
+              if (hasKeyword) continue;
+          }
 
-        // 3. Keywords (if configured)
-        if (settings.ignoreKeywords.length > 0) {
-            const text = (record?.text || '').toLowerCase();
-            const hasKeyword = settings.ignoreKeywords.some(kw => text.includes(kw.toLowerCase()));
-            if (hasKeyword) continue;
-        }
+          validPosts.push(feedView);
+      }
 
-        validPosts.push(feedView);
+      // If we found sinceUri, or if sinceUri was null (first run, just capture latest page), we stop paginating
+      if (foundSinceUri || !sinceUri) {
+          break;
+      }
+
+      cursor = response.data.cursor;
+      if (!cursor) break;
+
+      pageCount++;
     }
 
     // Return them in chronological order (Oldest -> Newest) so they post to Discord in order

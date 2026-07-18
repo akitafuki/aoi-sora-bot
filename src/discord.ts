@@ -1,25 +1,36 @@
-import { Client, GatewayIntentBits, TextChannel, EmbedBuilder } from 'discord.js';
+import { Client, GatewayIntentBits, TextChannel, EmbedBuilder, WebhookClient } from 'discord.js';
 import { config } from './config';
 import { AppBskyFeedDefs, AppBskyFeedPost, AppBskyEmbedImages, AppBskyEmbedExternal } from '@atproto/api';
 
-const client = new Client({
-  intents: [GatewayIntentBits.Guilds],
-});
-
+let client: Client | null = null;
+let webhookClient: WebhookClient | null = null;
 let targetChannel: TextChannel | null = null;
 
 export async function initDiscord() {
+  if (config.discord.webhookUrl) {
+    console.log('Using Discord Webhook Client');
+    webhookClient = new WebhookClient({ url: config.discord.webhookUrl });
+    return;
+  }
+
+  // Fallback to bot client
+  client = new Client({
+    intents: [GatewayIntentBits.Guilds],
+  });
+
   return new Promise<void>((resolve, reject) => {
+    if (!client) return reject(new Error('Client not initialized'));
+    
     client.once('ready', async () => {
-      console.log(`Discord Bot logged in as ${client.user?.tag}`);
+      console.log(`Discord Bot logged in as ${client?.user?.tag}`);
       
       try {
-        const channel = await client.channels.fetch(config.discord.channelId);
+        const channel = await client?.channels.fetch(config.discord.channelId);
         if (channel?.isTextBased() && !channel.isDMBased()) {
              targetChannel = channel as TextChannel;
              resolve();
         } else {
-            reject(new Error('Channel not found or is not a text channel.'));
+             reject(new Error('Channel not found or is not a text channel.'));
         }
       } catch (error) {
         reject(error);
@@ -30,8 +41,22 @@ export async function initDiscord() {
   });
 }
 
+export async function destroyDiscord() {
+  if (client) {
+    client.destroy();
+    client = null;
+    console.log('Discord Bot client connection destroyed.');
+  }
+  if (webhookClient) {
+    webhookClient.destroy();
+    webhookClient = null;
+    console.log('Discord Webhook client connection destroyed.');
+  }
+  targetChannel = null;
+}
+
 export async function postToDiscord(feedView: AppBskyFeedDefs.FeedViewPost) {
-  if (!targetChannel) throw new Error('Discord channel not initialized');
+  if (!webhookClient && !targetChannel) throw new Error('Discord channel or Webhook not initialized');
 
   const post = feedView.post;
   if (!AppBskyFeedPost.isRecord(post.record)) return; // Skip if not a valid record
@@ -45,41 +70,57 @@ export async function postToDiscord(feedView: AppBskyFeedDefs.FeedViewPost) {
   const handle = post.author.handle;
   const postUrl = `https://bsky.app/profile/${handle}/post/${rkey}`;
 
-    const embed = new EmbedBuilder()
-      .setAuthor({ 
-          name: `${post.author.displayName || handle} (@${handle})`, 
-          iconURL: post.author.avatar ?? undefined
-      })    .setDescription(text.length > 0 ? text : null) // Description cannot be empty string
+  const embeds: EmbedBuilder[] = [];
+
+  const mainEmbed = new EmbedBuilder()
+    .setAuthor({ 
+        name: `${post.author.displayName || handle} (@${handle})`, 
+        iconURL: post.author.avatar ?? undefined
+    })
+    .setDescription(text.length > 0 ? text : null) // Description cannot be empty string
     .setColor(0x0084ff) // Blue-ish
     .setTimestamp(new Date(record.createdAt))
     .setURL(postUrl);
 
-  // Handle Images
-  // BlueSky embeds images in 'post.embed'
-  // We can only put one main image in a Discord Embed properly via setImage.
-  // If there are multiple, we might need multiple embeds or just show the first one.
-  // For simplicity, we'll show the first one.
+  embeds.push(mainEmbed);
+
+  // Handle Images (Up to 4 images mosaic/collage)
   if (post.embed && AppBskyEmbedImages.isView(post.embed)) {
       const images = post.embed.images;
       if (images && images.length > 0) {
-          embed.setImage(images[0].fullsize);
+          mainEmbed.setImage(images[0].fullsize);
+          for (let i = 1; i < images.length; i++) {
+              const imageEmbed = new EmbedBuilder()
+                  .setURL(postUrl)
+                  .setImage(images[i].fullsize);
+              embeds.push(imageEmbed);
+          }
       }
   }
 
   // Handle External Links (Cards)
   if (post.embed && AppBskyEmbedExternal.isView(post.embed)) {
       const external = post.embed.external;
-      // We can add this to the footer or a field
-      embed.addFields({ name: 'Link', value: `[${external.title}](${external.uri})` });
-      if (external.thumb && !embed.data.image) {
-          embed.setImage(external.thumb);
+      mainEmbed.addFields({ name: 'Link', value: `[${external.title}](${external.uri})` });
+      if (external.thumb && embeds.length === 1 && !mainEmbed.data.image) {
+          mainEmbed.setImage(external.thumb);
       }
   }
 
   try {
-    await targetChannel.send({ content: `New post on BlueSky:\n${postUrl}`, embeds: [embed] });
+    const payload = {
+      content: `New post on BlueSky:\n${postUrl}`,
+      embeds: embeds
+    };
+
+    if (webhookClient) {
+      await webhookClient.send(payload);
+    } else if (targetChannel) {
+      await targetChannel.send(payload);
+    }
     console.log(`Posted to Discord: ${rkey}`);
   } catch (error) {
     console.error('Failed to send to Discord:', error);
+    throw error; // Propagate the error so that index.ts can isolate it
   }
 }

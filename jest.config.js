@@ -6,4 +6,10 @@ module.exports = {
   clearMocks: true,
   resetMocks: true,
   restoreMocks: true,
+  collectCoverageFrom: [
+    'src/**/*.ts',
+    '!src/db.ts',
+    '!src/swaggerConfig.ts',
+    '!src/generate-docs.ts',
+  ],
 };
