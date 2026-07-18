@@ -1,16 +1,18 @@
 {
   "compilerOptions": {
-    "target": "es2020",
-    "module": "commonjs",
+    "target": "es2022",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
     "rootDir": "./src",
     "outDir": "./dist",
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "strict": true,
+    "isolatedModules": true,
     "skipLibCheck": true,
-    "baseUrl": ".",
+    "types": ["node", "jest"],
     "paths": {
-      "@atproto/api": ["node_modules/@atproto/api/dist/index.d.ts"]
+      "@atproto/api": ["./node_modules/@atproto/api/dist/index.d.ts"]
     }
   },
   "exclude": ["prisma.config.ts", "tests"]
