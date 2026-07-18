@@ -11,4 +11,4 @@ COPY . .
 
 RUN npm run build
 
-CMD ["npm", "start"]
+CMD ["sh", "-c", "npx prisma db push && node dist/index.js"]
