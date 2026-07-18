@@ -9,7 +9,5 @@ module.exports = {
   collectCoverageFrom: [
     'src/**/*.ts',
     '!src/db.ts',
-    '!src/swaggerConfig.ts',
-    '!src/generate-docs.ts',
   ],
 };

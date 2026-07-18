@@ -1,8 +1,7 @@
-import { config, getSettings } from './config';
+import { getSettings } from './config';
 import { loadState, saveState } from './state';
 import { authenticateBluesky, getLatestPosts } from './bluesky';
 import { initDiscord, postToDiscord, destroyDiscord } from './discord';
-import { startServer, setTriggerCallback, setRescheduleCallback } from './server';
 import { prisma } from './db';
 
 let activeTimeout: NodeJS.Timeout | null = null;
@@ -88,16 +87,6 @@ async function main() {
   try {
     console.log('Starting BlueSky -> Discord Bot...');
     
-    // Start API Server
-    startServer(config.port);
-    setTriggerCallback(runCheck);
-    
-    // Bind Real-time Rescheduling Callback
-    setRescheduleCallback((newInterval) => {
-        console.log(`Rescheduling polling loop to new interval: ${newInterval} minutes.`);
-        reschedulePolling(newInterval);
-    });
-
     await authenticateBluesky();
     await initDiscord();
 

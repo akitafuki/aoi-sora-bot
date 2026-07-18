@@ -3,8 +3,6 @@ version: '3.8'
 services:
   app:
     build: .
-    ports:
-      - "3000:3000"
     environment:
       - DATABASE_URL=postgresql://user:password@db:5432/bluesky_bot
       # Other env vars should be passed here or via .env file
@@ -12,7 +10,6 @@ services:
       - .env
     depends_on:
       - db
-    command: sh -c "npx prisma migrate deploy && npm start"
     restart: unless-stopped
 
   db:

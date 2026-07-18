@@ -14,7 +14,6 @@ export const config = {
     channelId: process.env.DISCORD_CHANNEL_ID || '',
     webhookUrl: process.env.DISCORD_WEBHOOK_URL || '',
   },
-  port: parseInt(process.env.PORT || '3000', 10),
 };
 
 const hasBluesky = !!(process.env.BLUESKY_IDENTIFIER && process.env.BLUESKY_APP_PASSWORD);
